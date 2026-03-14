@@ -1,6 +1,3 @@
-// The User model defines what a "user" looks like in our database.
-// Each user has a name, email, password, and a role (customer or admin).
-
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
@@ -23,22 +20,29 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['customer', 'admin'], // Only these two values allowed
+    enum: ['customer', 'admin'],
     default: 'customer',
   },
-}, { timestamps: true }); // Adds createdAt and updatedAt automatically
+}, { timestamps: true });
 
-// BEFORE saving to DB, hash the password if it was modified
-// This means we never store plain text passwords
-userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
-  this.password = await bcrypt.hash(this.password, 12);
-  next();
+// Hash password before saving
+userSchema.pre('save', async function(next) {
+  // If password was not changed, skip hashing
+  if (!this.isModified('password')) {
+    return next();
+  }
+  
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error);
+  }
 });
 
-// Method to compare entered password with stored hash
-// Called during login: user.matchPassword('enteredPassword')
-userSchema.methods.matchPassword = async function (enteredPassword) {
+// Compare password method
+userSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
