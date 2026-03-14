@@ -27,17 +27,28 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) {
-    next();
-    return;
+// Using callback style instead of async to fix Kareem conflict
+userSchema.pre('save', function(next) {
+  const user = this;
+
+  // Only hash if password was modified
+  if (!user.isModified('password')) {
+    return next();
   }
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-  next();
+
+  // Generate salt then hash
+  bcrypt.genSalt(10, function(err, salt) {
+    if (err) return next(err);
+
+    bcrypt.hash(user.password, salt, function(err, hash) {
+      if (err) return next(err);
+      user.password = hash;
+      next();
+    });
+  });
 });
 
-userSchema.methods.matchPassword = async function (enteredPassword) {
+userSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
