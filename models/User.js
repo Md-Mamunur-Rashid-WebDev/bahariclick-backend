@@ -27,27 +27,36 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Using callback style instead of async to fix Kareem conflict
+// Hash password before saving to database
+// Using callback style to avoid Kareem/Mongoose async conflict
 userSchema.pre('save', function(next) {
   const user = this;
 
-  // Only hash if password was modified
+  // If password was not changed skip hashing
   if (!user.isModified('password')) {
     return next();
   }
 
-  // Generate salt then hash
-  bcrypt.genSalt(10, function(err, salt) {
-    if (err) return next(err);
+  // Generate salt
+  bcrypt.genSalt(10, function(saltErr, salt) {
+    if (saltErr) {
+      return next(saltErr);
+    }
 
-    bcrypt.hash(user.password, salt, function(err, hash) {
-      if (err) return next(err);
+    // Hash password with salt
+    bcrypt.hash(user.password, salt, function(hashErr, hash) {
+      if (hashErr) {
+        return next(hashErr);
+      }
+
+      // Replace plain password with hashed password
       user.password = hash;
       next();
     });
   });
 });
 
+// Method to compare entered password with hashed password in database
 userSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
